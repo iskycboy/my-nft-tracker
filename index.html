@@ -196,7 +196,7 @@
                     </select>
                 </div>
                 <div class="form-group"><label>Tanggal (Misal: 2 Okt)</label><input type="text" id="inpDate" placeholder="Opsional"></div>
-                <button type="submit" class="btn-submit">Simpan ke Supabase</button>
+                <button type="submit" class="btn-submit">Simpan</button>
             </form>
         </div>
     </div>
@@ -240,7 +240,7 @@
             }));
 
             document.getElementById('globalLoading').style.display = 'flex';
-            document.getElementById('loadingMsg').innerText = "Memindahkan data ke Supabase...";
+            document.getElementById('loadingMsg').innerText = "Memindahkan data...";
             toggleFabMenu(); 
 
             try {
@@ -299,7 +299,7 @@
 
             closeModal();
             document.getElementById('globalLoading').style.display = 'flex';
-            document.getElementById('loadingMsg').innerText = "Menyimpan ke Supabase...";
+            document.getElementById('loadingMsg').innerText = "Menyimpan...";
 
             try {
                 if(editId) {
@@ -322,7 +322,7 @@
         }
 
         async function deleteProject(index, id) {
-            if (confirm("Hapus project ini dari Supabase secara permanen?")) {
+            if (confirm("Hapus project ini dari secara permanen?")) {
                 document.getElementById('globalLoading').style.display = 'flex';
                 document.getElementById('loadingMsg').innerText = "Menghapus data...";
                 
