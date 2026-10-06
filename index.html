@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NFT Tracker (Supabase)</title>
+    <!-- Import Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-body: #f4f6f8; --bg-card: #ffffff; --border: #eaedf1;
+            --text-main: #1f2937; --text-muted: #6b7280;
+            --primary: #3b82f6; --danger: #ef4444; --warning: #f59e0b; --success: #10b981;
+            
+            --status-upcoming-bg: #d1fae5; --status-upcoming-text: #059669;
+            --status-tba-bg: #f3f4f6; --status-tba-text: #4b5563;
+            --status-ended-bg: #ffe4e6; --status-ended-text: #e11d48;
+
+            --chain-robinhood: #fef08a; --chain-robinhood-text: #854d0e;
+            --chain-giwa: #e0e7ff; --chain-giwa-text: #3730a3;
+            --chain-near: #1e293b; --chain-near-text: #f8fafc;
+            --chain-hyperliquid: #ccfbf1; --chain-hyperliquid-text: #0f766e;
+            --chain-ink: #fbcfe8; --chain-ink-text: #be185d;
+            --chain-nfts: #f3e8ff; --chain-nfts-text: #7e22ce;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 0; padding-bottom: 90px; }
+
+        /* LOADING OVERLAY */
+        #globalLoading {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(255,255,255,0.9); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.3s;
+        }
+        .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .header { background-color: var(--bg-card); padding: 16px 20px 8px 20px; position: sticky; top: 0; z-index: 100; }
+        .title { font-size: 1.25rem; font-weight: 700; margin: 0 0 12px 0; display:flex; justify-content: space-between; align-items:center;}
+        .search-box { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid #d1d5db; background-color: #f9fafb; font-size: 0.95rem; outline: none; margin-bottom: 8px; }
+        .search-box:focus { border-color: var(--primary); background-color: #ffffff; }
+
+        .chain-nav { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+        .chain-nav::-webkit-scrollbar { display: none; }
+        .chain-tab { font-size: 0.95rem; font-weight: 600; color: var(--text-muted); padding: 8px 4px; cursor: pointer; white-space: nowrap; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .chain-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        .filter-tabs { display: flex; gap: 8px; padding: 12px 20px; background-color: var(--bg-body); overflow-x: auto; scrollbar-width: none; }
+        .filter-tabs::-webkit-scrollbar { display: none; }
+        .status-tab { padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background-color: var(--bg-card); color: var(--text-muted); white-space: nowrap; }
+        .status-tab.active { background-color: var(--text-main); color: var(--bg-card); border-color: var(--text-main); }
+
+        .container { padding: 0 16px; display: grid; gap: 12px; }
+        .card { background-color: var(--bg-card); border-radius: 16px; padding: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; position: relative; transition: all 0.3s ease; }
+        
+        .card.highlight-closest { border: 2px solid #fbbf24; background-color: #fffbeb; box-shadow: 0 6px 16px rgba(251, 191, 36, 0.25); }
+        .badge-fire { background-color: #f59e0b; color: white; padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; animation: pulse 2s infinite; white-space: nowrap; }
+        @keyframes pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
+
+        .card.delete-mode { border-color: var(--danger); }
+        .card.edit-mode { border-color: var(--warning); }
+
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .project-name { font-size: 1.1rem; font-weight: 700; color: var(--text-main); line-height: 1.3; }
+        .link-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background-color: #f3f4f6; color: #1da1f2; text-decoration: none; flex-shrink: 0; }
+        .link-btn svg { width: 16px; height: 16px; fill: currentColor; }
+        
+        .card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; justify-content: space-between;}
+        .badges-group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;}
+        
+        .badge { padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .badge.chain-robinhood { background-color: var(--chain-robinhood); color: var(--chain-robinhood-text); }
+        .badge.chain-giwa { background-color: var(--chain-giwa); color: var(--chain-giwa-text); }
+        .badge.chain-near { background-color: var(--chain-near); color: var(--chain-near-text); }
+        .badge.chain-hyperliquid { background-color: var(--chain-hyperliquid); color: var(--chain-hyperliquid-text); }
+        .badge.chain-ink { background-color: var(--chain-ink); color: var(--chain-ink-text); }
+        .badge.chain-nfts { background-color: var(--chain-nfts); color: var(--chain-nfts-text); }
+        .badge.chain-unknown { background-color: #e5e7eb; color: #374151; }
+
+        .badge.status-upcoming { background-color: var(--status-upcoming-bg); color: var(--status-upcoming-text); border: 1px solid #a7f3d0; }
+        .badge.status-tba { background-color: var(--status-tba-bg); color: var(--status-tba-text); border: 1px solid #e5e7eb; }
+        .badge.status-ended { background-color: var(--status-ended-bg); color: var(--status-ended-text); border: 1px solid #fecdd3; }
+
+        .date-info { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 4px; }
+        
+        .action-btns { display: none; align-items: center; gap: 8px; }
+        .action-btn { border: none; color: white; font-size: 0.8rem; font-weight: 600; cursor: pointer; padding: 6px 12px; border-radius: 6px; }
+        .btn-del { background-color: var(--danger); }
+        .btn-edit { background-color: var(--warning); color: #1f2937; }
+        
+        .delete-mode .action-btns { display: flex; }
+        .delete-mode .btn-edit { display: none; }
+        .edit-mode .action-btns { display: flex; }
+        .edit-mode .btn-del { display: none; }
+        
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 0.95rem; }
+
+        .fab-container { position: fixed; bottom: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 12px; }
+        .fab-main { width: 56px; height: 56px; background-color: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); border: none; cursor: pointer; transition: transform 0.3s; }
+        .fab-main.active { transform: rotate(45deg); background-color: var(--text-main); }
+        .fab-options { display: flex; flex-direction: column; gap: 10px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; transform: translateY(20px); align-items: flex-end; }
+        .fab-options.active { opacity: 1; pointer-events: auto; transform: translateY(0); }
+        .fab-opt { display: flex; align-items: center; gap: 10px; background: none; border: none; cursor: pointer; }
+        .fab-label { background-color: var(--bg-card); padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: var(--text-main); }
+        .fab-icon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1); color: white; border: none; }
+        .fab-add { background-color: var(--primary); }
+        .fab-del-menu { background-color: var(--danger); }
+        .fab-edit-menu { background-color: var(--warning); }
+        .fab-migrate { background-color: var(--success); }
+        
+        #modeBanner { position: fixed; top: 0; left: 0; width: 100%; color: white; text-align: center; padding: 6px; font-size: 0.85rem; font-weight: 600; z-index: 2000; transform: translateY(-100%); transition: transform 0.3s; }
+        #modeBanner.show { transform: translateY(0); }
+        .banner-danger { background-color: var(--danger); }
+        .banner-warning { background-color: var(--warning); color: #1f2937 !important; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2500; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background-color: var(--bg-card); width: 90%; max-width: 400px; border-radius: 16px; padding: 20px; transform: translateY(20px); transition: transform 0.3s; }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-header h2 { margin: 0; font-size: 1.2rem; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);}
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; color: var(--text-muted); }
+        .form-group input, .form-group select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background-color: #f9fafb; }
+        .btn-submit { width: 100%; padding: 12px; background-color: var(--primary); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    
+    <div id="globalLoading">
+        <div class="spinner"></div>
+        <h3 style="margin:0; color:#3b82f6;">Memuat Database...</h3>
+        <p id="loadingMsg" style="color:#6b7280; font-size:0.9rem;">Menarik data dari Supabase</p>
+    </div>
+
+    <div id="modeBanner">INFO MODE</div>
+
+    <div class="header">
+        <h1 class="title">NFT Tracker</h1>
+        <input type="text" id="searchInput" class="search-box" placeholder="Cari nama project..." onkeyup="filterCards()">
+        <div class="chain-nav" id="chainNav">
+            <div class="chain-tab active" onclick="setChainFilter('All')">Semua Chain</div>
+        </div>
+    </div>
+
+    <div class="filter-tabs" id="statusNav">
+        <div class="status-tab active" onclick="setStatusFilter('All')">Semua Status</div>
+        <div class="status-tab" onclick="setStatusFilter('Upcoming')">Upcoming</div>
+        <div class="status-tab" onclick="setStatusFilter('TBA')">TBA</div>
+        <div class="status-tab" onclick="setStatusFilter('Ended')">Ended</div>
+    </div>
+
+    <div class="container" id="projectContainer"></div>
+
+    <div class="fab-container">
+        <div class="fab-options" id="fabMenu">
+            <button class="fab-opt" onclick="migrateLocalData()" id="btnMigrate" style="display:none;">
+                <div class="fab-label">Migrasi Data HP ke Supabase</div>
+                <div class="fab-icon fab-migrate">🚀</div>
+            </button>
+            <button class="fab-opt" onclick="toggleMode('delete')">
+                <div class="fab-label" id="delLabel">Hapus Data</div>
+                <div class="fab-icon fab-del-menu">🗑️</div>
+            </button>
+            <button class="fab-opt" onclick="toggleMode('edit')">
+                <div class="fab-label" id="editLabel">Edit Data</div>
+                <div class="fab-icon fab-edit-menu">✏️</div>
+            </button>
+            <button class="fab-opt" onclick="openModal()">
+                <div class="fab-label">Tambah Baru</div>
+                <div class="fab-icon fab-add">📝</div>
+            </button>
+        </div>
+        <button class="fab-main" id="fabMainBtn" onclick="toggleFabMenu()">+</button>
+    </div>
+
+    <div class="modal-overlay" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Tambah Project</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="addForm" onsubmit="saveProject(event)">
+                <input type="hidden" id="editId">
+                <div class="form-group"><label>Nama Project *</label><input type="text" id="inpName" required></div>
+                <div class="form-group"><label>Link (X / Web) *</label><input type="url" id="inpUrl" required></div>
+                <div class="form-group"><label>Chain (Bisa Bebas)</label><input type="text" id="inpChain" placeholder="Contoh: Robinhood, GIWA..."></div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="inpStatus">
+                        <option value="TBA">TBA</option>
+                        <option value="Upcoming">Upcoming</option>
+                        <option value="Ended">Ended</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Tanggal (Misal: 2 Okt)</label><input type="text" id="inpDate" placeholder="Opsional"></div>
+                <button type="submit" class="btn-submit">Simpan ke Supabase</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // KREDENSIAL SUPABASE SUDAH TERPASANG
+        const SUPABASE_URL = "https://plrgcpfakzkovzfnlpda.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_7xR98Ash5D7tCYgtWAJHAA_Um6gu5ym";
+
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let projects = [];
+        let currentChain = 'All';
+        let currentStatus = 'Upcoming'; 
+        let currentMode = 'normal'; 
+        const linkIcon = `<svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
+
+        // Deteksi tombol migrasi
+        window.addEventListener('DOMContentLoaded', () => {
+            const localV4 = localStorage.getItem('myTrackerDataV4');
+            const localV3 = localStorage.getItem('myTrackerDataV3');
+            if (localV4 || localV3) {
+                document.getElementById('btnMigrate').style.display = 'flex';
+            }
+        });
+
+        // 🚀 FUNGSI MIGRASI OTOMATIS
+        async function migrateLocalData() {
+            const localData = localStorage.getItem('myTrackerDataV4') || localStorage.getItem('myTrackerDataV3');
+            if (!localData) return;
+
+            const parsedData = JSON.parse(localData);
+            const cleanData = parsedData.map(p => ({
+                id: p.id,
+                name: p.name,
+                url: p.url,
+                chain: p.chain,
+                status: p.status,
+                date: p.date
+            }));
+
+            document.getElementById('globalLoading').style.display = 'flex';
+            document.getElementById('loadingMsg').innerText = "Memindahkan data ke Supabase...";
+            toggleFabMenu(); 
+
+            try {
+                const { data, error } = await _supabase.from('projects').insert(cleanData);
+                if (error) throw error;
+                
+                alert("Sukses! Data HP Anda telah diamankan ke Supabase.");
+                localStorage.removeItem('myTrackerDataV4');
+                localStorage.removeItem('myTrackerDataV3');
+                document.getElementById('btnMigrate').style.display = 'none';
+                
+                fetchDatabase(); 
+            } catch (err) {
+                console.error(err);
+                alert("Gagal Migrasi: Pastikan Anda telah mematikan fitur RLS pada tabel 'projects' di Supabase.");
+            } finally {
+                document.getElementById('globalLoading').style.display = 'none';
+            }
+        }
+
+        // ==========================================
+        // 🚀 FUNGSI CRUD SUPABASE
+        // ==========================================
+        async function fetchDatabase() {
+            try {
+                const { data, error } = await _supabase.from('projects').select('*').order('id', { ascending: false });
+                if (error) throw error;
+                
+                projects = data;
+                
+                document.getElementById('globalLoading').style.opacity = '0';
+                setTimeout(() => document.getElementById('globalLoading').style.display = 'none', 300);
+                
+                renderChainTabs();
+                setStatusFilter('Upcoming'); 
+
+            } catch (error) {
+                alert("Gagal mengambil data dari Supabase. Pastikan tabel 'projects' sudah dibuat dan RLS dimatikan.");
+                console.error(error);
+                document.getElementById('globalLoading').style.display = 'none';
+            }
+        }
+
+        async function saveProject(e) {
+            e.preventDefault();
+            const editId = document.getElementById('editId').value;
+            const chainVal = document.getElementById('inpChain').value.trim();
+            
+            const projectData = {
+                name: document.getElementById('inpName').value,
+                url: document.getElementById('inpUrl').value,
+                chain: chainVal,
+                status: document.getElementById('inpStatus').value,
+                date: document.getElementById('inpDate').value
+            };
+
+            closeModal();
+            document.getElementById('globalLoading').style.display = 'flex';
+            document.getElementById('loadingMsg').innerText = "Menyimpan ke Supabase...";
+
+            try {
+                if(editId) {
+                    const { error } = await _supabase.from('projects').update(projectData).eq('id', editId);
+                    if (error) throw error;
+                } else {
+                    projectData.id = Date.now(); 
+                    const { error } = await _supabase.from('projects').insert([projectData]);
+                    if (error) throw error;
+                }
+                
+                if(currentMode === 'edit') toggleMode('edit'); 
+                document.getElementById('addForm').reset();
+                await fetchDatabase(); 
+            } catch(e) {
+                console.error(e);
+                alert("Gagal menyimpan ke server: " + e.message);
+                document.getElementById('globalLoading').style.display = 'none';
+            }
+        }
+
+        async function deleteProject(index, id) {
+            if (confirm("Hapus project ini dari Supabase secara permanen?")) {
+                document.getElementById('globalLoading').style.display = 'flex';
+                document.getElementById('loadingMsg').innerText = "Menghapus data...";
+                
+                try {
+                    const { error } = await _supabase.from('projects').delete().eq('id', id);
+                    if (error) throw error;
+                    await fetchDatabase();
+                } catch(e) {
+                    alert("Gagal menghapus: " + e.message);
+                    document.getElementById('globalLoading').style.display = 'none';
+                }
+            }
+        }
+
+        // ==========================================
+
+        function toggleFabMenu() {
+            document.getElementById('fabMenu').classList.toggle('active');
+            document.getElementById('fabMainBtn').classList.toggle('active');
+        }
+        
+        function toggleMode(mode) {
+            toggleFabMenu(); 
+            const banner = document.getElementById('modeBanner');
+            const delLabel = document.getElementById('delLabel');
+            const editLabel = document.getElementById('editLabel');
+            
+            if(currentMode === mode) {
+                currentMode = 'normal';
+                banner.classList.remove('show');
+                delLabel.innerText = "Hapus Data";
+                editLabel.innerText = "Edit Data";
+            } else {
+                currentMode = mode;
+                banner.classList.add('show');
+                if(mode === 'delete') {
+                    banner.innerText = "⚠️ KLIK TOMBOL MERAH UNTUK MENGHAPUS ⚠️";
+                    banner.className = "banner-danger show";
+                    delLabel.innerText = "Tutup Mode Hapus";
+                    editLabel.innerText = "Edit Data";
+                } else if(mode === 'edit') {
+                    banner.innerText = "✏️ KLIK TOMBOL KUNING UNTUK MENGEDIT ✏️";
+                    banner.className = "banner-warning show";
+                    editLabel.innerText = "Tutup Mode Edit";
+                    delLabel.innerText = "Hapus Data";
+                }
+            }
+            renderCards(); 
+        }
+
+        function renderChainTabs() {
+            const chainNav = document.getElementById('chainNav');
+            const uniqueChains = [...new Set(projects.map(p => p.chain.trim()))].filter(c => c !== "");
+            chainNav.innerHTML = `<div class="chain-tab ${currentChain === 'All' ? 'active' : ''}" onclick="setChainFilter('All', this)">Semua Chain</div>`;
+            uniqueChains.forEach(chain => {
+                const isActive = currentChain === chain ? 'active' : '';
+                chainNav.innerHTML += `<div class="chain-tab ${isActive}" onclick="setChainFilter('${chain}', this)">${chain}</div>`;
+            });
+        }
+
+        function parseDateForSort(dateStr) {
+            if (!dateStr || dateStr.trim() === "") return Infinity; 
+            let cleanStr = dateStr.split(',')[0].split('(')[0].trim().toLowerCase();
+            const monthMap = { 'jan':0, 'feb':1, 'mar':2, 'apr':3, 'mei':4, 'jun':5, 'jul':6, 'agt':7, 'sep':8, 'okt':9, 'nov':10, 'des':11 };
+            let parts = cleanStr.split(' ');
+            if (parts.length >= 2) {
+                let day = parseInt(parts[0]);
+                let monthStr = parts[1];
+                let monthIndex = -1;
+                for (let key in monthMap) { if (monthStr.startsWith(key)) { monthIndex = monthMap[key]; break; } }
+                if (!isNaN(day) && monthIndex !== -1) return new Date(2026, monthIndex, day).getTime();
+            }
+            return Infinity; 
+        }
+
+        function renderCards() {
+            const container = document.getElementById('projectContainer');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            container.innerHTML = '';
+
+            let filteredProjects = projects.filter(p => {
+                const matchChain = currentChain === 'All' || p.chain === currentChain;
+                const matchStatus = currentStatus === 'All' || p.status === currentStatus;
+                const matchSearch = p.name.toLowerCase().includes(searchTerm);
+                return matchChain && matchStatus && matchSearch;
+            });
+
+            if (currentStatus === 'Upcoming') {
+                filteredProjects.sort((a, b) => parseDateForSort(a.date) - parseDateForSort(b.date));
+            }
+
+            let closestTimestamp = -1;
+            if (currentStatus === 'Upcoming' && filteredProjects.length > 0) {
+                closestTimestamp = parseDateForSort(filteredProjects[0].date);
+            }
+
+            let count = 0;
+            filteredProjects.forEach((p) => {
+                count++;
+                let chainClass = p.chain ? 'chain-' + p.chain.toLowerCase().replace(/[^a-z0-9]/g, '') : 'chain-unknown';
+                let chainLabel = p.chain || 'UNKNOWN';
+                let statusClass = 'status-' + p.status.toLowerCase();
+                
+                let cardModeClass = '';
+                if(currentMode === 'delete') cardModeClass = 'delete-mode';
+                if(currentMode === 'edit') cardModeClass = 'edit-mode';
+                
+                let isClosest = false;
+                let projectTimestamp = parseDateForSort(p.date);
+                if (currentStatus === 'Upcoming' && projectTimestamp === closestTimestamp && projectTimestamp !== Infinity) {
+                    isClosest = true;
+                    cardModeClass += ' highlight-closest'; 
+                }
+
+                let originalIndex = projects.findIndex(orig => orig.id == p.id);
+
+                const card = document.createElement('div');
+                card.className = `card ${cardModeClass}`;
+                
+                const fireBadge = isClosest ? `<div class="badge-fire">🔥 Terdekat</div>` : '';
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div style="display:flex; align-items:center; gap:8px; flex-wrap: wrap;">
+                            <div class="project-name">${p.name}</div>
+                            ${fireBadge}
+                        </div>
+                        <a href="${p.url}" target="_blank" class="link-btn">${linkIcon}</a>
+                    </div>
+                    <div class="card-footer">
+                        <div class="badges-group">
+                            <div class="badge ${chainClass}">${chainLabel}</div>
+                            <div class="badge ${statusClass}">${p.status}</div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            ${p.date ? `<div class="date-info">📅 ${p.date}</div>` : ''}
+                            <div class="action-btns">
+                                <button class="action-btn btn-edit" onclick="openEditModal(${p.id})">Edit</button>
+                                <button class="action-btn btn-del" onclick="deleteProject(${originalIndex}, ${p.id})">Hapus</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            if (count === 0) container.innerHTML = `<div class="empty-state">Project tidak ditemukan.</div>`;
+        }
+
+        function setChainFilter(chain, element) {
+            currentChain = chain;
+            if(element) {
+                document.querySelectorAll('.chain-tab').forEach(t => t.classList.remove('active'));
+                element.classList.add('active');
+            } else renderChainTabs();
+            renderCards();
+        }
+
+        function setStatusFilter(status) {
+            currentStatus = status;
+            document.querySelectorAll('.status-tab').forEach(t => {
+                if(t.innerText.includes(status) || (status === 'All' && t.innerText === 'Semua Status')) t.classList.add('active');
+                else t.classList.remove('active');
+            });
+            renderCards();
+        }
+
+        function filterCards() { renderCards(); }
+
+        function openModal() { 
+            document.getElementById('addForm').reset();
+            document.getElementById('editId').value = "";
+            document.getElementById('modalTitle').innerText = "Tambah Project";
+            
+            document.getElementById('fabMenu').classList.remove('active');
+            document.getElementById('fabMainBtn').classList.remove('active');
+            document.getElementById('addModal').classList.add('active'); 
+        }
+        
+        function openEditModal(id) {
+            let project = projects.find(p => p.id == id);
+            if(!project) return;
+            
+            document.getElementById('editId').value = project.id;
+            document.getElementById('inpName').value = project.name;
+            document.getElementById('inpUrl').value = project.url;
+            document.getElementById('inpChain').value = project.chain;
+            document.getElementById('inpStatus').value = project.status;
+            document.getElementById('inpDate').value = project.date;
+            
+            document.getElementById('modalTitle').innerText = "Edit Project";
+            document.getElementById('addModal').classList.add('active'); 
+        }
+        
+        function closeModal() { document.getElementById('addModal').classList.remove('active'); }
+
+        window.onload = fetchDatabase;
+    </script>
+</body>
+</html>
