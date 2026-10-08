@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NFT Tracker (Supabase)</title>
-    <!-- Import Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -27,12 +26,7 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 0; padding-bottom: 90px; }
 
-        /* LOADING OVERLAY */
-        #globalLoading {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(255,255,255,0.9); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.3s;
-        }
+        #globalLoading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.3s; }
         .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         
@@ -96,9 +90,26 @@
         
         .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 0.95rem; }
 
-        .fab-container { position: fixed; bottom: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 12px; }
-        .fab-main { width: 56px; height: 56px; background-color: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); border: none; cursor: pointer; transition: transform 0.3s; }
+        /* --- FLOATING MENU (FAB) --- */
+        .fab-container { 
+            position: fixed; bottom: 24px; right: 24px; z-index: 1000; 
+            display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 12px; 
+            /* Transisi halus saat disembunyikan oleh scroll */
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); 
+        }
+        /* Class ini ditambahkan otomatis saat layar di-scroll ke bawah */
+        .fab-container.hide { transform: translateY(120px); pointer-events: none; }
+
+        .fab-main { 
+            width: 56px; height: 56px; background-color: var(--primary); color: white; 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            font-size: 1.8rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); 
+            border: none; cursor: pointer; transition: all 0.3s;
+            opacity: 0.75; /* Tembus Pandang saat diam */
+        }
+        .fab-main:hover, .fab-main.active { opacity: 1; /* Kembali solid saat disentuh */ }
         .fab-main.active { transform: rotate(45deg); background-color: var(--text-main); }
+        
         .fab-options { display: flex; flex-direction: column; gap: 10px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; transform: translateY(20px); align-items: flex-end; }
         .fab-options.active { opacity: 1; pointer-events: auto; transform: translateY(0); }
         .fab-opt { display: flex; align-items: center; gap: 10px; background: none; border: none; cursor: pointer; }
@@ -154,7 +165,7 @@
 
     <div class="container" id="projectContainer"></div>
 
-    <div class="fab-container">
+    <div class="fab-container" id="fabContainer">
         <div class="fab-options" id="fabMenu">
             <button class="fab-opt" onclick="migrateLocalData()" id="btnMigrate" style="display:none;">
                 <div class="fab-label">Migrasi Data HP ke Supabase</div>
@@ -196,13 +207,13 @@
                     </select>
                 </div>
                 <div class="form-group"><label>Tanggal (Misal: 2 Okt)</label><input type="text" id="inpDate" placeholder="Opsional"></div>
-                <button type="submit" class="btn-submit">Simpan</button>
+                <button type="submit" class="btn-submit">Simpan ke Supabase</button>
             </form>
         </div>
     </div>
 
     <script>
-        // KREDENSIAL SUPABASE SUDAH TERPASANG
+        // KREDENSIAL SUPABASE
         const SUPABASE_URL = "https://plrgcpfakzkovzfnlpda.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_7xR98Ash5D7tCYgtWAJHAA_Um6gu5ym";
 
@@ -214,6 +225,25 @@
         let currentStatus = 'Upcoming'; 
         let currentMode = 'normal'; 
         const linkIcon = `<svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
+
+        // ==========================================
+        // 🚀 SMART FAB (Menghindar otomatis saat scroll)
+        // ==========================================
+        let lastScrollY = window.scrollY;
+        const fabContainerElement = document.getElementById('fabContainer');
+
+        window.addEventListener('scroll', () => {
+            const isMenuOpen = document.getElementById('fabMenu').classList.contains('active');
+            
+            // Jika scroll ke bawah lebih dari 30px dan menu FAB sedang tidak dibuka
+            if (window.scrollY > lastScrollY && window.scrollY > 30 && !isMenuOpen) {
+                fabContainerElement.classList.add('hide'); // Sembunyikan FAB
+            } else {
+                fabContainerElement.classList.remove('hide'); // Munculkan FAB
+            }
+            lastScrollY = window.scrollY;
+        }, { passive: true });
+
 
         // Deteksi tombol migrasi
         window.addEventListener('DOMContentLoaded', () => {
@@ -240,7 +270,7 @@
             }));
 
             document.getElementById('globalLoading').style.display = 'flex';
-            document.getElementById('loadingMsg').innerText = "Memindahkan data...";
+            document.getElementById('loadingMsg').innerText = "Memindahkan data ke Supabase...";
             toggleFabMenu(); 
 
             try {
@@ -299,7 +329,7 @@
 
             closeModal();
             document.getElementById('globalLoading').style.display = 'flex';
-            document.getElementById('loadingMsg').innerText = "Menyimpan...";
+            document.getElementById('loadingMsg').innerText = "Menyimpan ke Supabase...";
 
             try {
                 if(editId) {
@@ -322,7 +352,7 @@
         }
 
         async function deleteProject(index, id) {
-            if (confirm("Hapus project ini dari secara permanen?")) {
+            if (confirm("Hapus project ini dari Supabase secara permanen?")) {
                 document.getElementById('globalLoading').style.display = 'flex';
                 document.getElementById('loadingMsg').innerText = "Menghapus data...";
                 
