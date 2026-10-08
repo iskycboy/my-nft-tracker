@@ -24,7 +24,9 @@
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 0; padding-bottom: 90px; }
+        
+        /* Tambahan padding-bottom besar agar kartu terakhir bisa di-scroll bebas dari FAB */
+        body { font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 0; padding-bottom: 160px; }
 
         #globalLoading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.3s; }
         .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
@@ -78,8 +80,19 @@
 
         .date-info { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 4px; }
         
-        .action-btns { display: none; align-items: center; gap: 8px; }
-        .action-btn { border: none; color: white; font-size: 0.8rem; font-weight: 600; cursor: pointer; padding: 6px 12px; border-radius: 6px; }
+        /* DESAIN BARU TOMBOL AKSI: Lebar Penuh (Menjauhi FAB) */
+        .action-btns { 
+            display: none; align-items: center; gap: 10px; 
+            margin-top: 12px; padding-top: 12px; 
+            border-top: 1px dashed var(--border); 
+            width: 100%;
+        }
+        .action-btn { 
+            border: none; color: white; font-size: 0.95rem; font-weight: 600; 
+            cursor: pointer; padding: 12px; border-radius: 8px; 
+            flex: 1; /* Membuat tombol melebar 100% */
+            display: flex; justify-content: center; align-items: center; gap: 6px;
+        }
         .btn-del { background-color: var(--danger); }
         .btn-edit { background-color: var(--warning); color: #1f2937; }
         
@@ -90,24 +103,11 @@
         
         .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 0.95rem; }
 
-        /* --- FLOATING MENU (FAB) --- */
-        .fab-container { 
-            position: fixed; bottom: 24px; right: 24px; z-index: 1000; 
-            display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 12px; 
-            /* Transisi halus saat disembunyikan oleh scroll */
-            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); 
-        }
-        /* Class ini ditambahkan otomatis saat layar di-scroll ke bawah */
+        .fab-container { position: fixed; bottom: 24px; right: 24px; z-index: 1000; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 12px; transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
         .fab-container.hide { transform: translateY(120px); pointer-events: none; }
 
-        .fab-main { 
-            width: 56px; height: 56px; background-color: var(--primary); color: white; 
-            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
-            font-size: 1.8rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); 
-            border: none; cursor: pointer; transition: all 0.3s;
-            opacity: 0.75; /* Tembus Pandang saat diam */
-        }
-        .fab-main:hover, .fab-main.active { opacity: 1; /* Kembali solid saat disentuh */ }
+        .fab-main { width: 56px; height: 56px; background-color: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); border: none; cursor: pointer; transition: all 0.3s; opacity: 0.85; }
+        .fab-main:hover, .fab-main.active { opacity: 1; }
         .fab-main.active { transform: rotate(45deg); background-color: var(--text-main); }
         
         .fab-options { display: flex; flex-direction: column; gap: 10px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; transform: translateY(20px); align-items: flex-end; }
@@ -226,26 +226,19 @@
         let currentMode = 'normal'; 
         const linkIcon = `<svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
 
-        // ==========================================
-        // 🚀 SMART FAB (Menghindar otomatis saat scroll)
-        // ==========================================
         let lastScrollY = window.scrollY;
         const fabContainerElement = document.getElementById('fabContainer');
 
         window.addEventListener('scroll', () => {
             const isMenuOpen = document.getElementById('fabMenu').classList.contains('active');
-            
-            // Jika scroll ke bawah lebih dari 30px dan menu FAB sedang tidak dibuka
             if (window.scrollY > lastScrollY && window.scrollY > 30 && !isMenuOpen) {
-                fabContainerElement.classList.add('hide'); // Sembunyikan FAB
+                fabContainerElement.classList.add('hide'); 
             } else {
-                fabContainerElement.classList.remove('hide'); // Munculkan FAB
+                fabContainerElement.classList.remove('hide'); 
             }
             lastScrollY = window.scrollY;
         }, { passive: true });
 
-
-        // Deteksi tombol migrasi
         window.addEventListener('DOMContentLoaded', () => {
             const localV4 = localStorage.getItem('myTrackerDataV4');
             const localV3 = localStorage.getItem('myTrackerDataV3');
@@ -254,7 +247,6 @@
             }
         });
 
-        // 🚀 FUNGSI MIGRASI OTOMATIS
         async function migrateLocalData() {
             const localData = localStorage.getItem('myTrackerDataV4') || localStorage.getItem('myTrackerDataV3');
             if (!localData) return;
@@ -291,9 +283,6 @@
             }
         }
 
-        // ==========================================
-        // 🚀 FUNGSI CRUD SUPABASE
-        // ==========================================
         async function fetchDatabase() {
             try {
                 const { data, error } = await _supabase.from('projects').select('*').order('id', { ascending: false });
@@ -366,8 +355,6 @@
                 }
             }
         }
-
-        // ==========================================
 
         function toggleFabMenu() {
             document.getElementById('fabMenu').classList.toggle('active');
@@ -487,13 +474,12 @@
                             <div class="badge ${chainClass}">${chainLabel}</div>
                             <div class="badge ${statusClass}">${p.status}</div>
                         </div>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            ${p.date ? `<div class="date-info">📅 ${p.date}</div>` : ''}
-                            <div class="action-btns">
-                                <button class="action-btn btn-edit" onclick="openEditModal(${p.id})">Edit</button>
-                                <button class="action-btn btn-del" onclick="deleteProject(${originalIndex}, ${p.id})">Hapus</button>
-                            </div>
-                        </div>
+                        ${p.date ? `<div class="date-info">📅 ${p.date}</div>` : ''}
+                    </div>
+                    <!-- Tombol Aksi di baris baru agar tidak tertutup FAB -->
+                    <div class="action-btns">
+                        <button class="action-btn btn-edit" onclick="openEditModal(${p.id})">✏️ Edit Project</button>
+                        <button class="action-btn btn-del" onclick="deleteProject(${originalIndex}, ${p.id})">🗑️ Hapus Project</button>
                     </div>
                 `;
                 container.appendChild(card);
